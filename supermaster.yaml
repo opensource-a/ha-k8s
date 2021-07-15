@@ -1,0 +1,297 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  PermissionsBoundary:
+    Type: String
+    Default: 'arn:aws:iam::aws:policy/AdministratorAccess'
+    Description: Permissions Boundary ARN for all roles 
+  AMIId:
+    Type: String
+    Default: ami-0742b4e673072066f
+    Description: Image ID for the EC2
+  InstanceType:
+    Type: String
+    Default: t2.medium
+    Description: Instance Type of EC2
+  InstanceVolumeSizeInGB:
+    Type: Number
+    Default: 50
+    Description: Instance Volume size in GB   
+  ENI:
+    Type: String
+    Default: eni-0073cd0fed09945c6
+    Description: ENI to use with EC2
+  NlbDns:
+    Type: String
+    Default: kube-api-test-412e653d7616bb46.elb.us-east-1.amazonaws.com
+    Description: DNS of API Service NLB
+  NlbPort:
+    Type: Number
+    Default: 6443
+    Description: DNS of API Service NLB
+  SubnetId:
+    Type: String
+    Default: subnet-1b15e17d
+    Description: Subnet in which the EC2 spins up   
+  SecurityGroupId:
+    Type: String
+    Default: sg-556c827b
+    Description: Security Group of the EC2     
+  DockerHubUserName:
+    Type: String
+    Default: madhavanscrum
+    Description: DockerHub login Username 
+  DockerHubToken:
+    Type: String
+    Default: ee036247-620f-4756-9dc6-2210ad6ee9e4
+    Description: DockerHub login Token 
+    
+Resources:
+  KeyPairLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt 
+        - LambdaRole
+        - Arn
+      Runtime: python2.7
+      Description: Test with Cloud Formation
+      FunctionName: !Ref 'AWS::StackName'
+      Code:
+        ZipFile: |-
+          import json
+          import logging
+          import signal
+          import boto3
+
+          from urllib2 import build_opener, HTTPHandler, Request
+
+          s3 = boto3.resource('s3')
+          s3client = boto3.client('s3')
+          ec2 = boto3.client('ec2')
+
+          LOGGER = logging.getLogger()
+          LOGGER.setLevel(logging.INFO)
+
+
+          def lambda_handler(event, context):
+              keypairname = event['ResourceProperties']['KeyPairName']
+              accountid = boto3.client('sts').get_caller_identity()['Account']
+              bucket = accountid+"-"+keypairname
+              key = keypairname + ".pem"
+              print key
+
+              try:
+                  LOGGER.info('REQUEST RECEIVED:\n %s', event)
+                  LOGGER.info('REQUEST RECEIVED:\n %s', context)
+                  if event['RequestType'] == 'Create':
+                      LOGGER.info('CREATE!')
+                      response = ec2.create_key_pair(KeyName=keypairname)
+                      keymaterial = response['KeyMaterial']
+                      s3.create_bucket(Bucket=bucket)
+                      s3client.put_bucket_encryption(Bucket=bucket, ServerSideEncryptionConfiguration={'Rules': [{ 'ApplyServerSideEncryptionByDefault': { 'SSEAlgorithm': 'aws:kms' }}]})
+                      object = s3.Object(bucket, key)
+                      object.put(Body=keymaterial)
+                      send_response(event, context, "SUCCESS",
+                                    {"Message": "Resource creation successful!"})
+                  elif event['RequestType'] == 'Update':
+                      LOGGER.info('UPDATE!')
+                      send_response(event, context, "SUCCESS",
+                                    {"Message": "Resource update successful!"})
+                  elif event['RequestType'] == 'Delete':
+                      LOGGER.info('DELETE!')
+                      response = ec2.delete_key_pair(KeyName=keypairname)
+                      object = s3.Object(bucket, key)
+                      object.delete()
+                      objectb = s3.Bucket(bucket)
+                      objectb.delete()
+                      send_response(event, context, "SUCCESS",
+                                    {"Message": "Resource deletion successful!"})
+                  else:
+                      LOGGER.info('FAILED!')
+                      send_response(event, context, "FAILED",
+                                    {"Message": "Unexpected event received from CloudFormation"})
+              except: #pylint: disable=W0702
+                  LOGGER.info('FAILED!')
+                  send_response(event, context, "FAILED", {
+                      "Message": "Exception during processing"})
+
+
+          def send_response(event, context, response_status, response_data):
+              '''Send a resource manipulation status response to CloudFormation'''
+              response_body = json.dumps({
+                  "Status": response_status,
+                  "Reason": "See the details in CloudWatch Log Stream: " + context.log_stream_name,
+                  "PhysicalResourceId": context.log_stream_name,
+                  "StackId": event['StackId'],
+                  "RequestId": event['RequestId'],
+                  "LogicalResourceId": event['LogicalResourceId'],
+                  "Data": response_data
+              })
+
+              LOGGER.info('ResponseURL: %s', event['ResponseURL'])
+              LOGGER.info('ResponseBody: %s', response_body)
+
+              opener = build_opener(HTTPHandler)
+              request = Request(event['ResponseURL'], data=response_body)
+              request.add_header('Content-Type', '')
+              request.add_header('Content-Length', len(response_body))
+              request.get_method = lambda: 'PUT'
+              response = opener.open(request)
+              LOGGER.info("Status code: %s", response.getcode())
+              LOGGER.info("Status message: %s", response.msg)
+              
+    DependsOn:
+      - LambdaRole
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      PermissionsBoundary: !Ref PermissionsBoundary      
+      Policies:
+        - PolicyName: lambdas3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action: 's3:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'ec2:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*'
+  LambdaInvoke:
+    Type: 'Custom::Invoker'
+    Properties:
+      Description: This is how you invoke the Lambda
+      ServiceToken: !Sub >-
+        arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}
+      KeyPairName: !Ref 'AWS::StackName'
+    DependsOn:
+      - KeyPairLambda
+
+  EC2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Master'
+      UserData:
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            
+            yum update -y
+            yum install -y git
+            yum install -y docker
+            service docker start
+            systemctl enable docker.service
+            docker login --username ${DockerHubUserName} --password ${DockerHubToken}
+            
+            cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+            br_netfilter
+            EOF
+            
+            cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+            net.bridge.bridge-nf-call-ip6tables = 1
+            net.bridge.bridge-nf-call-iptables = 1
+            EOF
+            
+            sysctl --system
+            
+            cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+            [kubernetes]
+            name=Kubernetes
+            baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+            enabled=1
+            gpgcheck=1
+            repo_gpgcheck=1
+            gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+            exclude=kubelet kubeadm kubectl
+            EOF
+            
+            # Set SELinux in permissive mode (effectively disabling it)
+            setenforce 0
+            sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+            yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+            systemctl enable --now kubelet
+            
+            kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint ${NlbDns}:${NlbPort} --upload-certs
+            
+            export KUBECONFIG=/etc/kubernetes/admin.conf
+            mkdir -p /home/ec2-user/.kube
+            sudo cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
+            sudo chown ec2-user:ec2-user /home/ec2-user/.kube/config
+            
+            kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+            
+            kubectl label nodes $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') supermaster=yes
+
+            kubectl create namespace kubernetes-dashboard
+
+            kubectl create secret docker-registry regcred --namespace kubernetes-dashboard --docker-server=docker.io --docker-username=${DockerHubUserName} --docker-password=${DockerHubToken} 
+            
+            workerjoin=$(sudo kubeadm token create --print-join-command --ttl 0)
+            certkey=$(sudo kubeadm init phase upload-certs --upload-certs | tail -c 65)
+            masterjoin=$(echo "$workerjoin --control-plane --certificate-key $certkey")
+            
+            aws secretsmanager create-secret --name ${AWS::StackName}-joinworker     --description "command to join as worker node in k8s cluster" --secret-string "$workerjoin" --region ${AWS::Region}
+            aws secretsmanager create-secret --name ${AWS::StackName}-joinmaster     --description "command to join as master node in k8s cluster" --secret-string "$masterjoin" --region ${AWS::Region}
+            
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: !Ref InstanceVolumeSizeInGB
+            VolumeType: gp2
+      KeyName: !Ref 'AWS::StackName'
+      NetworkInterfaces:
+      - NetworkInterfaceId: !Ref ENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref EC2PROFILE
+
+            
+  EC2ROLE:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      PermissionsBoundary: !Ref PermissionsBoundary
+      Policies:
+        - PolicyName: ec2policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: '*'
+                Effect: Allow
+                Resource: '*'
+  EC2PROFILE:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref EC2ROLE
+
