@@ -38,11 +38,11 @@ Parameters:
     Description: Security Group of the EC2     
   DockerHubUserName:
     Type: String
-    Default: madhavanscrum
+    Default: -
     Description: DockerHub login Username 
   DockerHubToken:
     Type: String
-    Default: ee036247-620f-4756-9dc6-2210ad6ee9e4
+    Default: -
     Description: DockerHub login Token 
     
 Resources:
