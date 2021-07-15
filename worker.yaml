@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  PermissionsBoundary:
+    Type: String
+    Default: 'arn:aws:iam::aws:policy/AdministratorAccess'
+    Description: Permissions Boundary ARN for all roles 
+  SuperMasterStackName:
+    Type: String
+    Default: k8s-106-1
+    Description: Stack Name that spun up the Super Master 
+  AMIId:
+    Type: String
+    Default: ami-0742b4e673072066f
+    Description: Image ID for the EC2
+  InstanceType:
+    Type: String
+    Default: t2.medium
+    Description: Instance Type of EC2
+  InstanceVolumeSizeInGB:
+    Type: Number
+    Default: 50
+    Description: Instance Volume size in GB   
+  SubnetId:
+    Type: String
+    Default: subnet-1b15e17d
+    Description: Subnet in which the EC2 spins up   
+  SecurityGroupId:
+    Type: String
+    Default: sg-556c827b
+    Description: Security Group of the EC2     
+  DockerHubUserName:
+    Type: String
+    Default: -
+    Description: DockerHub login Username 
+  DockerHubToken:
+    Type: String
+    Default: -
+    Description: DockerHub login Token 
+    
+Resources:
+
+
+  EC2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Worker'
+      UserData:
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            
+            yum update -y
+            yum install -y git
+            yum install -y docker
+            service docker start
+            systemctl enable docker.service
+            docker login --username ${DockerHubUserName} --password ${DockerHubToken}
+            
+            cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+            br_netfilter
+            EOF
+            
+            cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+            net.bridge.bridge-nf-call-ip6tables = 1
+            net.bridge.bridge-nf-call-iptables = 1
+            EOF
+            
+            sysctl --system
+            
+            cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+            [kubernetes]
+            name=Kubernetes
+            baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+            enabled=1
+            gpgcheck=1
+            repo_gpgcheck=1
+            gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+            exclude=kubelet kubeadm kubectl
+            EOF
+            
+            # Set SELinux in permissive mode (effectively disabling it)
+            setenforce 0
+            sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+            yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+            systemctl enable --now kubelet
+            
+            aws secretsmanager get-secret-value --secret-id ${SuperMasterStackName}-joinworker --region ${AWS::Region} --query SecretString --output text | sh
+            #export KUBECONFIG=/etc/kubernetes/admin.conf
+            mkdir -p /home/ec2-user/.kube
+            sudo cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
+            sudo chown ec2-user:ec2-user /home/ec2-user/.kube/config
+            
+            
+            
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: 'true'
+            VolumeSize: !Ref InstanceVolumeSizeInGB
+            VolumeType: gp2
+      KeyName: !Ref SuperMasterStackName
+      IamInstanceProfile: !Ref EC2PROFILE
+
+            
+  EC2ROLE:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      PermissionsBoundary: !Ref PermissionsBoundary
+      Policies:
+        - PolicyName: ec2policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: '*'
+                Effect: Allow
+                Resource: '*'
+  EC2PROFILE:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref EC2ROLE
