@@ -18,34 +18,56 @@ Parameters:
     Description: Instance Volume size in GB   
   ENI:
     Type: String
-    Default: eni-0073cd0fed09945c6
+    Default: eni-0c0f71f0cbd0f35a8
     Description: ENI to use with EC2
-  NlbDns:
+  NlbVpcId:
     Type: String
-    Default: kube-api-test-412e653d7616bb46.elb.us-east-1.amazonaws.com
-    Description: DNS of API Service NLB
-  NlbPort:
-    Type: Number
-    Default: 6443
-    Description: DNS of API Service NLB
-  SubnetId:
-    Type: String
-    Default: subnet-1b15e17d
-    Description: Subnet in which the EC2 spins up   
-  SecurityGroupId:
-    Type: String
-    Default: sg-556c827b
-    Description: Security Group of the EC2     
+    Default: vpc-97ceceed
+    Description: NLB VPC  
+  NlbSubnetId:
+    Type: CommaDelimitedList
+    Default: subnet-1b15e17d,subnet-df3b00e1,subnet-fda454a2,subnet-36f80a17,subnet-97e463da,subnet-ce05abc0
+    Description: NLB Subnets   
   DockerHubUserName:
     Type: String
-    Default: -
+    Default: madhavanscrum
     Description: DockerHub login Username 
   DockerHubToken:
     Type: String
-    Default: -
-    Description: DockerHub login Token 
-    
+    Default: ee036247-620f-4756-9dc6-2210ad6ee9e4
+    Description: DockerHub login Token     
+
 Resources:
+  NetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${AWS::StackName}-nlb'
+      Scheme: internal
+      Subnets: !Ref NlbSubnetId
+      Type: network
+  NetworkLoadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-tg'
+      Port: 6443
+      Protocol: TCP
+      VpcId: !Ref NlbVpcId
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPort: 6443
+      HealthCheckProtocol: TCP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3      
+  NetworkLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref NetworkLoadBalancerTargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: '6443'
+      Protocol: TCP
   KeyPairLambda:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -196,66 +218,67 @@ Resources:
           Value: !Sub '${AWS::StackName}-Master'
       UserData:
         Fn::Base64: 
-          !Sub |
-            #!/bin/bash
-            
-            yum update -y
-            yum install -y git
-            yum install -y docker
-            service docker start
-            systemctl enable docker.service
-            docker login --username ${DockerHubUserName} --password ${DockerHubToken}
-            
-            cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
-            br_netfilter
-            EOF
-            
-            cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-            net.bridge.bridge-nf-call-ip6tables = 1
-            net.bridge.bridge-nf-call-iptables = 1
-            EOF
-            
-            sysctl --system
-            
-            cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
-            [kubernetes]
-            name=Kubernetes
-            baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
-            enabled=1
-            gpgcheck=1
-            repo_gpgcheck=1
-            gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-            exclude=kubelet kubeadm kubectl
-            EOF
-            
-            # Set SELinux in permissive mode (effectively disabling it)
-            setenforce 0
-            sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
-            yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
-            systemctl enable --now kubelet
-            
-            kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint ${NlbDns}:${NlbPort} --upload-certs
-            
-            export KUBECONFIG=/etc/kubernetes/admin.conf
-            mkdir -p /home/ec2-user/.kube
-            sudo cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
-            sudo chown ec2-user:ec2-user /home/ec2-user/.kube/config
-            
-            kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-            
-            kubectl label nodes $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') supermaster=yes
-
-            kubectl create namespace kubernetes-dashboard
-
-            kubectl create secret docker-registry regcred --namespace kubernetes-dashboard --docker-server=docker.io --docker-username=${DockerHubUserName} --docker-password=${DockerHubToken} 
-            
-            workerjoin=$(sudo kubeadm token create --print-join-command --ttl 0)
-            certkey=$(sudo kubeadm init phase upload-certs --upload-certs | tail -c 65)
-            masterjoin=$(echo "$workerjoin --control-plane --certificate-key $certkey")
-            
-            aws secretsmanager create-secret --name ${AWS::StackName}-joinworker     --description "command to join as worker node in k8s cluster" --secret-string "$workerjoin" --region ${AWS::Region}
-            aws secretsmanager create-secret --name ${AWS::StackName}-joinmaster     --description "command to join as master node in k8s cluster" --secret-string "$masterjoin" --region ${AWS::Region}
-            
+          Fn::Sub: 
+            - |
+              #!/bin/bash
+              
+              yum update -y
+              yum install -y git
+              yum install -y docker
+              service docker start
+              systemctl enable docker.service
+              docker login --username ${DockerHubUserName} --password ${DockerHubToken}
+              
+              cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+              br_netfilter
+              EOF
+              
+              cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+              net.bridge.bridge-nf-call-ip6tables = 1
+              net.bridge.bridge-nf-call-iptables = 1
+              EOF
+              
+              sysctl --system
+              
+              cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+              [kubernetes]
+              name=Kubernetes
+              baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+              enabled=1
+              gpgcheck=1
+              repo_gpgcheck=1
+              gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+              exclude=kubelet kubeadm kubectl
+              EOF
+              
+              # Set SELinux in permissive mode (effectively disabling it)
+              setenforce 0
+              sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+              yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+              systemctl enable --now kubelet
+              
+              aws elbv2 register-targets --target-group-arn ${TargetGroupArn} --targets Id=$(curl http://169.254.169.254/latest/meta-data/local-ipv4),Port=6443 --region ${AWS::Region}
+              kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint ${NlbDns}:6443 --upload-certs
+              
+              export KUBECONFIG=/etc/kubernetes/admin.conf
+              mkdir -p /home/ec2-user/.kube
+              sudo cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
+              sudo chown ec2-user:ec2-user /home/ec2-user/.kube/config
+              
+              kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+              
+              kubectl label nodes $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') supermaster=yes
+              kubectl create namespace kubernetes-dashboard
+              kubectl create secret docker-registry regcred --namespace kubernetes-dashboard --docker-server=docker.io --docker-username=${DockerHubUserName} --docker-password=${DockerHubToken} 
+              
+              workerjoin=$(sudo kubeadm token create --print-join-command --ttl 0)
+              certkey=$(sudo kubeadm init phase upload-certs --upload-certs | tail -c 65)
+              masterjoin=$(echo "$workerjoin --control-plane --certificate-key $certkey")
+              
+              aws secretsmanager create-secret --name ${AWS::StackName}-joinworker     --description "command to join as worker node in k8s cluster" --secret-string "$workerjoin" --region ${AWS::Region}
+              aws secretsmanager create-secret --name ${AWS::StackName}-joinmaster     --description "command to join as master node in k8s cluster" --secret-string "$masterjoin" --region ${AWS::Region}
+            - NlbDns: !GetAtt NetworkLoadBalancer.DNSName
+              TargetGroupArn: !Ref NetworkLoadBalancerTargetGroup
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
@@ -267,7 +290,10 @@ Resources:
       - NetworkInterfaceId: !Ref ENI
         DeviceIndex: '0'
       IamInstanceProfile: !Ref EC2PROFILE
-
+    DependsOn:
+      - LambdaInvoke
+      - NetworkLoadBalancer
+      - NetworkLoadBalancerTargetGroup
             
   EC2ROLE:
     Type: 'AWS::IAM::Role'
@@ -294,4 +320,9 @@ Resources:
     Properties:
       Roles:
         - !Ref EC2ROLE
-
+Outputs:
+  TargetGroupArn:
+    Description: ARN of the master nodes target group
+    Value: !Ref NetworkLoadBalancerTargetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-TargetGroupArn"
