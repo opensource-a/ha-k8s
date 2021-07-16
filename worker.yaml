@@ -3,11 +3,11 @@ Parameters:
   PermissionsBoundary:
     Type: String
     Default: 'arn:aws:iam::aws:policy/AdministratorAccess'
-    Description: Permissions Boundary ARN for all roles 
+    Description: Permissions Boundary ARN for all roles
   SuperMasterStackName:
     Type: String
-    Default: k8s-106-1
-    Description: Stack Name that spun up the Super Master 
+    Default: k8s-master-107
+    Description: Stack Name that spun up the Super Master
   AMIId:
     Type: String
     Default: ami-0742b4e673072066f
@@ -19,27 +19,24 @@ Parameters:
   InstanceVolumeSizeInGB:
     Type: Number
     Default: 50
-    Description: Instance Volume size in GB   
+    Description: Instance Volume size in GB
   SubnetId:
     Type: String
     Default: subnet-1b15e17d
     Description: Subnet in which the EC2 spins up   
-  SecurityGroupId:
-    Type: String
+  SecurityGroupIds:
+    Type: CommaDelimitedList
     Default: sg-556c827b
-    Description: Security Group of the EC2     
+    Description: Security Group of the EC2       
   DockerHubUserName:
     Type: String
-    Default: -
-    Description: DockerHub login Username 
+    Default: madhavanscrum
+    Description: DockerHub login Username
   DockerHubToken:
     Type: String
-    Default: -
-    Description: DockerHub login Token 
-    
+    Default: ee036247-620f-4756-9dc6-2210ad6ee9e4
+    Description: DockerHub login Token
 Resources:
-
-
   EC2:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -47,7 +44,7 @@ Resources:
       InstanceType: !Ref InstanceType
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-Worker'
+          Value: !Sub '${AWS::StackName}-Master'
       UserData:
         Fn::Base64: 
           !Sub |
@@ -91,21 +88,18 @@ Resources:
             aws secretsmanager get-secret-value --secret-id ${SuperMasterStackName}-joinworker --region ${AWS::Region} --query SecretString --output text | sh
             #export KUBECONFIG=/etc/kubernetes/admin.conf
             mkdir -p /home/ec2-user/.kube
-            sudo cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
-            sudo chown ec2-user:ec2-user /home/ec2-user/.kube/config
-            
-            
-            
+            cp -i /etc/kubernetes/admin.conf /home/ec2-user/.kube/config
+            chown ec2-user:ec2-user /home/ec2-user/.kube/config
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
             DeleteOnTermination: 'true'
             VolumeSize: !Ref InstanceVolumeSizeInGB
             VolumeType: gp2
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: !Ref SecurityGroupIds
       KeyName: !Ref SuperMasterStackName
       IamInstanceProfile: !Ref EC2PROFILE
-
-            
   EC2ROLE:
     Type: 'AWS::IAM::Role'
     Properties:
