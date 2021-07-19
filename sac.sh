@@ -70,6 +70,11 @@ echo https://$NodeIP:$NodePort
 
 dashboardtoken=$(kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep clusteradmin | awk '{print $1}') | grep token:)
 aws secretsmanager create-secret --name $aws_stackname-dashboardtoken --description "token to join login to dashboard" --secret-string "$dashboardtoken" --region us-east-1
+aws cloudformation create-stack --stack-name $aws_stackname-dashboard-alb --template-url https://$accountid-$aws_stackname-cft.s3.amazonaws.com/deploy-dashboard/dashboard-alb.yaml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=AlbVpcId,ParameterValue=$nlb_vpc ParameterKey=AlbSubnetId,ParameterValue=$nlb_subnets ParameterKey=AlbSecurityGroups,ParameterValue=$security_groups ParameterKey=DashboardNodePort,ParameterValue=$NodePort ParameterKey=AlbCertificateArn,ParameterValue=$dashboard_certificate_arn
+aws cloudformation wait stack-create-complete --stack-name $aws_stackname-dashboard-alb
+SuperMasterId=$(aws cloudformation describe-stacks --stack-name $aws_stackname-supermaster --query 'Stacks[].Outputs[?OutputKey==`SuperMasterId`].OutputValue' --output text)
+targetGroupArn=$(aws cloudformation describe-stacks --stack-name $aws_stackname-dashboard-alb --query 'Stacks[].Outputs[?OutputKey==`TargetGroupArn`].OutputValue' --output text)
+aws elbv2 register-targets --target-group-arn ${TargetGroupArn} --targets Id=$SuperMasterId,Port=$NodePort --region us-east-1
 
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
