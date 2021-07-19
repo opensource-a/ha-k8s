@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  AlbVpcId:
+    Type: String
+    Default: vpc-97ceceed
+    Description: ALB VPC
+  AlbSubnetId:
+    Type: CommaDelimitedList
+    Default: >-
+      subnet-1b15e17d,subnet-df3b00e1,subnet-fda454a2,subnet-36f80a17,subnet-97e463da,subnet-ce05abc0
+    Description: ALB Subnets
+  AlbSecurityGroups:
+    Type: CommaDelimitedList
+    Default: sg-556c827b
+    Description: ALB SecurityGroups
+  DashboardNodePort:
+    Type: Number
+    Default: 30027
+    Description: Dashboard Node Port
+  AlbCertificateArn:
+    Type: String
+    Default: 'arn:aws:iam::966033364941:server-certificate/self-theia'
+    Description: IAM Certificate Arn
+Resources:
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: !Sub '${AWS::StackName}'
+      Subnets: !Ref AlbSubnetId
+      SecurityGroups: !Ref AlbSecurityGroups
+  LoadBalancerListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref AlbCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DashboardTargetGroup
+  DashboardTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Sub '${AWS::StackName}-tg'
+      Port: !Ref DashboardNodePort
+      Protocol: HTTPS
+      VpcId: !Ref AlbVpcId
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPort: !Ref DashboardNodePort
+      HealthCheckProtocol: HTTPS
+      HealthCheckTimeoutSeconds: 9
+      HealthyThresholdCount: 3
+Outputs:
+  LoadBalancer:
+    Description: A reference to the Application Load Balancer
+    Value: !Ref LoadBalancer
+  LoadBalancerUrl:
+    Description: The URL of the ALB
+    Value: !GetAtt 
+      - LoadBalancer
+      - DNSName
+  Listener:
+    Description: A reference to a port 80 listener
+    Value: !Ref LoadBalancerListener
+  TargetGroupArn:
+    Description: ARN of the dashboaed target group
+    Value: !Ref DashboardTargetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-TargetGroupArn"    
