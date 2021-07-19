@@ -331,3 +331,8 @@ Outputs:
     Value: !GetAtt EC2.PrivateIp
     Export:
       Name: !Sub "${AWS::StackName}-SuperMasterIp"
+  SuperMasterId:
+    Description: Instance ID of supermaster EC2
+    Value: !Ref EC2
+    Export:
+      Name: !Sub "${AWS::StackName}-SuperMasterId"      
