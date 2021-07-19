@@ -126,3 +126,10 @@ Resources:
     Properties:
       Roles:
         - !Ref EC2ROLE
+        
+Outputs:
+  MasterIp:
+    Description: Private Ip of supermaster EC2
+    Value: !GetAtt PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-MasterIp"
