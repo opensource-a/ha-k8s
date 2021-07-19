@@ -40,36 +40,36 @@ subnets=$(echo $nlb_subnets | sed 's/\\//g')
 subnet_array=($(echo $subnets | tr "," "\n"))
 
 
-while (( workers > ++count )); do   
+while (( workers >= ++count )); do   
   echo $count
   worker_subnet=${subnet_array[RANDOM%${#subnet_array[@]}]}
   aws cloudformation create-stack --stack-name $aws_stackname-worker-$count --template-url https://$accountid-$aws_stackname-cft.s3.amazonaws.com/worker.yaml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=DockerHubUserName,ParameterValue=$dockerhub_username ParameterKey=DockerHubToken,ParameterValue=$dockerhub_token ParameterKey=SubnetId,ParameterValue=$worker_subnet ParameterKey=SecurityGroupIds,ParameterValue=$security_groups ParameterKey=SuperMasterStackName,ParameterValue=$aws_stackname-supermaster ParameterKey=PermissionsBoundary,ParameterValue=$permission_boundary ParameterKey=AMIId,ParameterValue=$ami_id ParameterKey=InstanceType,ParameterValue=$instance_type
 
-  aws cloudformation wait stack-create-complete --stack-name $aws_stackname-master-$count
+  aws cloudformation wait stack-create-complete --stack-name $aws_stackname-worker-$count
   echo "Worker $count is up..."
  
 done
 
-aws s3 cp s3://$accountid-$aws_stackname-supermaster .
-chmod 400 $aws_stackname-supermaster.pem
+aws s3 cp s3://$accountid-$aws_stackname-supermaster . --recursive
+chmod 400 $aws_stackname-supermaster.pem 
 
 curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 chmod +x kubectl
 sudo mv kubectl /usr/bin
 mkdir $HOME/.kube
 
-scp -o StrictHostKeyChecking=no -i $aws_stackname-supermaster.pem ec2-user@supermasterIp:$HOME/.kube/config $HOME/.kube/config
+scp -o StrictHostKeyChecking=no -i $aws_stackname-supermaster.pem ec2-user@$supermasterIp:$HOME/.kube/config $HOME/.kube/config
 
 kubectl get nodes
-kubectl apply -f deploy-dashboard.yaml
+kubectl apply -f deploy-dashboard/deploy-dashboard.yaml
 NodePort=$(kubectl get svc kubernetes-dashboard --namespace kubernetes-dashboard -o=jsonpath='{.spec.ports[?(@.port==443)].nodePort}')
 NodeIP=$(kubectl get node -o=jsonpath='{.items[?(@.metadata.labels.supermaster=="yes")].status.addresses[?(@.type=="InternalIP")].address}')
-kubectl apply -f admin-user.yaml
+kubectl apply -f deploy-dashboard/admin-user.yaml
 
 echo https://$NodeIP:$NodePort
 
 dashboardtoken=$(kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep clusteradmin | awk '{print $1}') | grep token:)
-aws secretsmanager create-secret --name ${AWS::StackName}-dashboardtoken     --description "token to join login to dashboard" --secret-string "$dashboardtoken" --region ${AWS::Region}
+aws secretsmanager create-secret --name $aws_stackname-dashboardtoken --description "token to join login to dashboard" --secret-string "$dashboardtoken" --region us-east-1
 
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
