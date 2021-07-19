@@ -10,3 +10,4 @@ security_groups: 'sg-556c827b'
 permission_boundary: 'arn:aws:iam::aws:policy/AdministratorAccess'
 ami_id: ami-0742b4e673072066f
 instance_type: t2.medium
+dashboard_certificate_arn: 'arn:aws:iam::966033364941:server-certificate/self-theia'
