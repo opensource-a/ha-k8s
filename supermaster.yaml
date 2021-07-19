@@ -30,11 +30,11 @@ Parameters:
     Description: NLB Subnets   
   DockerHubUserName:
     Type: String
-    Default: -
+    Default: test
     Description: DockerHub login Username 
   DockerHubToken:
     Type: String
-    Default: -
+    Default: test
     Description: DockerHub login Token     
 
 Resources:
