@@ -74,7 +74,7 @@ aws cloudformation create-stack --stack-name $aws_stackname-dashboard-alb --temp
 aws cloudformation wait stack-create-complete --stack-name $aws_stackname-dashboard-alb
 SuperMasterId=$(aws cloudformation describe-stacks --stack-name $aws_stackname-supermaster --query 'Stacks[].Outputs[?OutputKey==`SuperMasterId`].OutputValue' --output text)
 targetGroupArn=$(aws cloudformation describe-stacks --stack-name $aws_stackname-dashboard-alb --query 'Stacks[].Outputs[?OutputKey==`TargetGroupArn`].OutputValue' --output text)
-aws elbv2 register-targets --target-group-arn ${TargetGroupArn} --targets Id=$SuperMasterId,Port=$NodePort --region us-east-1
+aws elbv2 register-targets --target-group-arn $targetGroupArn --targets Id=$SuperMasterId,Port=$NodePort --region us-east-1
 
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
