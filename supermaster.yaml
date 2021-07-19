@@ -326,3 +326,8 @@ Outputs:
     Value: !Ref NetworkLoadBalancerTargetGroup
     Export:
       Name: !Sub "${AWS::StackName}-TargetGroupArn"
+  SuperMasterIp:
+    Description: Private Ip of supermaster EC2
+    Value: !GetAtt PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-SuperMasterIp"
