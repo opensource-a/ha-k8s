@@ -130,6 +130,6 @@ Resources:
 Outputs:
   MasterIp:
     Description: Private Ip of supermaster EC2
-    Value: !GetAtt PrivateIp
+    Value: !GetAtt EC2.PrivateIp
     Export:
       Name: !Sub "${AWS::StackName}-MasterIp"
