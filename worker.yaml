@@ -30,11 +30,11 @@ Parameters:
     Description: Security Group of the EC2       
   DockerHubUserName:
     Type: String
-    Default: -
+    Default: test
     Description: DockerHub login Username
   DockerHubToken:
     Type: String
-    Default: -
+    Default: test
     Description: DockerHub login Token
 Resources:
   EC2:
