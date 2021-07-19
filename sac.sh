@@ -16,15 +16,18 @@ aws cloudformation wait stack-create-complete --stack-name $aws_stackname-superm
 
 targetGroupArn=$(aws cloudformation describe-stacks --stack-name $aws_stackname-supermaster --query 'Stacks[].Outputs[?OutputKey==`TargetGroupArn`].OutputValue' --output text)
 supermasterIp=$(aws cloudformation describe-stacks --stack-name $aws_stackname-supermaster --query 'Stacks[].Outputs[?OutputKey==`SuperMasterIp`].OutputValue' --output text)
-
+echo "Supermaster is up... Waiting for it to connect to Master's NLB"
 aws elbv2 wait target-in-service --target-group-arn $targetGroupArn --targets Id=$supermasterIp,Port=6443
 
+masters=$master_nodes
 count=0
 
 while (( masters > ++count )); do   
+  echo $count
   aws cloudformation create-stack --stack-name $aws_stackname-master-$count --template-url https://$accountid-$aws_stackname-cft.s3.amazonaws.com/master.yaml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=DockerHubUserName,ParameterValue=$dockerhub_username ParameterKey=DockerHubToken,ParameterValue=$dockerhub_token ParameterKey=ENI,ParameterValue=${eni_array[$count]} ParameterKey=SuperMasterStackName,ParameterValue=$aws_stackname-supermaster ParameterKey=PermissionsBoundary,ParameterValue=$permission_boundary ParameterKey=AMIId,ParameterValue=$ami_id ParameterKey=InstanceType,ParameterValue=$instance_type
 
   aws cloudformation wait stack-create-complete --stack-name $aws_stackname-master-$count
+  echo "Master $count is up... Waiting for it to connect to Master's NLB"
   targetGroupArn=$(aws cloudformation describe-stacks --stack-name $aws_stackname-supermaster --query 'Stacks[].Outputs[?OutputKey==`TargetGroupArn`].OutputValue' --output text)
   masterIp=$(aws cloudformation describe-stacks --stack-name $aws_stackname-master-$count --query 'Stacks[].Outputs[?OutputKey==`MasterIp`].OutputValue' --output text)
 
