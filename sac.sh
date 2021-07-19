@@ -1,14 +1,7 @@
-aws_stackname=k8s-sac-101
-dockerhub_username=madhavanscrum
-dockerhub_token=ee036247-620f-4756-9dc6-2210ad6ee9e4
-enis=eni-0c0f71f0cbd0f35a8,eni-0073cd0fed09945c6,eni-01b1d00ca42cd6adb
-master_nodes=3
-worker_nodes=4
-nlb_vpc=vpc-97ceceed
-nlb_subnets='subnet-1b15e17d\,subnet-df3b00e1\,subnet-fda454a2\,subnet-36f80a17\,subnet-97e463da\,subnet-ce05abc0'
-permission_boundary=arn:aws:iam::aws:policy/AdministratorAccess
-ami_id=ami-0742b4e673072066f
-instance_type=t2.medium
+while read assign; do
+ export "$assign";
+done < <(sed -nE 's/([a-z_]+): (.*)/\1=\2/ p' sac-parameters.yml)
+
 
 accountid=$(aws sts get-caller-identity --query Account --output text)
 
