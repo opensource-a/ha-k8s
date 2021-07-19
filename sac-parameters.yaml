@@ -6,6 +6,7 @@ master_nodes: 3
 worker_nodes: 4
 nlb_vpc: vpc-97ceceed
 nlb_subnets: 'subnet-1b15e17d\,subnet-df3b00e1\,subnet-fda454a2\,subnet-36f80a17\,subnet-97e463da\,subnet-ce05abc0'
+security_groups: 'sg-556c827b'
 permission_boundary: 'arn:aws:iam::aws:policy/AdministratorAccess'
 ami_id: ami-0742b4e673072066f
 instance_type: t2.medium
