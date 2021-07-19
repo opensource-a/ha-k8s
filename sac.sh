@@ -73,3 +73,5 @@ aws secretsmanager create-secret --name $aws_stackname-dashboardtoken --descript
 
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
+rm -rf $HOME/.kube
+rm $aws_stackname-supermaster.pem
