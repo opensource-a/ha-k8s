@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  AlbVpcId:
+    Type: String
+    Default: vpc-97ceceed
+    Description: ALB VPC
+  DashboardNodePort:
+    Type: Number
+    Default: 30027
+    Description: Dashboard Node Port
+Resources:
+  DashboardTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Sub '${AWS::StackName}-tg'
+      Port: !Ref DashboardNodePort
+      Protocol: HTTPS
+      VpcId: !Ref AlbVpcId
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPort: !Ref DashboardNodePort
+      HealthCheckProtocol: HTTPS
+      HealthCheckTimeoutSeconds: 9
+      HealthyThresholdCount: 3
+Outputs:
+  TargetGroupArn:
+    Description: ARN of the dashboaed target group
+    Value: !Ref DashboardTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-TargetGroupArn'
