@@ -10,4 +10,4 @@ security_groups: 'sg-556c827b'
 permission_boundary: 'arn:aws:iam::aws:policy/AdministratorAccess'
 ami_id: ami-0742b4e673072066f
 instance_type: t2.medium
-dashboard_listener_arn: 'arn:aws:elasticloadbalancing:us-east-1:966033364941:listener/app/kube-test/71b0d3537c44dafe/a36f41eeb2f08f62'
+dashboard_listener_arn: arn:aws:elasticloadbalancing:us-east-1:966033364941:listener/app/kube-test/71b0d3537c44dafe/a36f41eeb2f08f62
