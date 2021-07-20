@@ -79,4 +79,4 @@ aws elbv2 register-targets --target-group-arn $targetGroupArn --targets Id=$Supe
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
 rm -rf $HOME/.kube
-rm $aws_stackname-supermaster.pem
+rm -f $aws_stackname-supermaster.pem
