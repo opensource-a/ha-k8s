@@ -36,7 +36,7 @@ done
 
 workers=$worker_nodes
 count=0
-subnets=$(echo $nlb_subnets | sed 's/\\//g')
+subnets=$(echo $nlb_subnets | sed "s/[\\\']//g")
 subnet_array=($(echo $subnets | tr "," "\n"))
 
 
