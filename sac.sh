@@ -2,6 +2,7 @@ while read assign; do
  export "$assign";
 done < <(sed -nE 's/([a-z_]+): (.*)/\1=\2/ p' sac-parameters.yaml)
 
+aws configure set default.region us-east-1
 
 accountid=$(aws sts get-caller-identity --query Account --output text)
 
