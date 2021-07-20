@@ -77,6 +77,8 @@ SuperMasterId=$(aws cloudformation describe-stacks --stack-name $aws_stackname-s
 targetGroupArn=$(aws cloudformation describe-stacks --stack-name $aws_stackname-dashboard-tg --query 'Stacks[].Outputs[?OutputKey==`TargetGroupArn`].OutputValue' --output text)
 aws elbv2 register-targets --target-group-arn $targetGroupArn --targets Id=$SuperMasterId,Port=$NodePort --region us-east-1
 
+aws elbv2 modify-listener --listener-arn $dashboard_listener_arn --port $NodePort --default-actions [{"Type": "forward","TargetGroupArn": "$targetGroupArn", "ForwardConfig": {"TargetGroups": [{"TargetGroupArn": "$targetGroupArn", "Weight": 1}]}}]
+
 aws s3 rm s3://$accountid-$aws_stackname-cft --recursive
 aws s3 rb s3://$accountid-$aws_stackname-cft
 rm -rf $HOME/.kube
