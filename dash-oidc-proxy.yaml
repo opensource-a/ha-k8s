@@ -30,6 +30,13 @@ spec:
           - --secure-cookie=false
         ports:
         - containerPort: 3000
+      nodeSelector:
+        "kubernetes.io/os": linux
+        supermaster: "yes"
+      # Comment the following tolerations if Dashboard must not be deployed on master
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule        
 ---
 apiVersion: v1
 kind: Service
