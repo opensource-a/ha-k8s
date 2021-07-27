@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guestbook-application-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guestbook-application-proxy
+  template:
+    metadata:
+      labels:
+        app: guestbook-application-proxy
+    spec:
+      containers:
+      - image: quay.io/gambol99/keycloak-proxy:v2.1.1
+        name: guestbook-application-proxy
+        args:
+          - --listen=0.0.0.0:3000
+          - --discovery-url=https://accounts.google.com
+          - --client-id=
+          - --client-secret=
+          - --skip-upstream-tls-verify=true
+          - --redirection-url=https://<elb-dns>
+          - --enable-refresh-tokens=true
+          - --upstream-url=http://frontend.guestbook.svc.cluster.local
+          - --resources=uri=/*
+          - --encryption-key=MsVRjD36bfAxfBvHUKUjXOTPXaItDThn 
+          - --secure-cookie=false
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook-application-proxy
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+    nodePort: 32251
+  selector:
+    app: guestbook-application-proxy
