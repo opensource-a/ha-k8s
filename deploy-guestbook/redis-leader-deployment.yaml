@@ -34,3 +34,10 @@ spec:
       - name: redis-leader-data
         persistentVolumeClaim:
           claimName: redis-leader-claim
+      nodeSelector:
+        "kubernetes.io/os": linux
+        supermaster: "yes"
+      # Comment the following tolerations if Dashboard must not be deployed on master
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule          
