@@ -16,6 +16,8 @@ spec:
         fsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
+      imagePullSecrets:
+        - name: regcred        
       containers:
         - name: main-oidc-proxy
           image: mriedmann/louketo-proxy
