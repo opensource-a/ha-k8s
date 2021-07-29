@@ -14,6 +14,8 @@ spec:
         app: hello-kubernetes-hello-world
         tier: frontend
     spec:
+      imagePullSecrets:
+        - name: regcred    
       containers:
       - name: hello-kubernetes-hello-world
         image: paulbouwer/hello-kubernetes:1.10
