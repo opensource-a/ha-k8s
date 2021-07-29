@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-oidc-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: main-oidc-proxy
+  template:
+    metadata:
+      labels:
+        app: main-oidc-proxy
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: main-oidc-proxy
+          image: mriedmann/louketo-proxy
+          imagePullPolicy: Always
+          args:
+            - --client-id=**************************************
+            - --client-secret=**********************************
+            - --discovery-url=https://accounts.google.com
+            - --enable-default-deny=true
+            - --enable-json-logging=true
+            - --enable-logging=true
+            - --enable-request-id=true
+            - --enable-security-filter=true
+            - --secure-cookie=false
+            - --http-only-cookie=false 
+            - --listen=0.0.0.0:3000
+            - --preserve-host=true
+            - --redirection-url=********************************
+            - --resources=uri=/*
+#            - --skip-client-id=false
+            - --upstream-url=https://ingress-nginx-controller.ingress-nginx.svc.cluster.local
+            - --encryption-key=MsVRjD36bfAxfBvHUKUjXOTPXaItDThn 
+            - --enable-refresh-tokens=true
+            - --skip-upstream-tls-verify=true
+            - --enable-token-header=true  #                   enables the token authentication header X-Auth-Token to upstream (default: true)
+            - --enable-authorization-header=true
+            - --enable-https-redirection=true
+          securityContext:
+            readOnlyRootFilesystem: true
+          ports:
+          - containerPort: 3000
+          resources:
+            limits:
+              cpu: 50m
+            requests:
+              cpu: 20m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-oidc-proxy
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+    nodePort: 32252
+  selector:
+    app: main-oidc-proxy
