@@ -1,0 +1,76 @@
+#kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.47.0/deploy/static/provider/baremetal/deploy.yaml
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: prod-app
+spec:
+  type: ExternalName
+  externalName: frontend.guestbook.svc.cluster.local
+  ports:
+  - port: 80
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: dev-app
+spec:
+  type: ExternalName
+  externalName: frontend.landing.svc.cluster.local
+  ports:
+  - port: 80
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: staging-app
+spec:
+  type: ExternalName
+  externalName: hello-kubernetes-hello-world.helloworld.svc.cluster.local
+  ports:
+  - port: 80
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-distribution-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  defaultBackend:
+    service:
+      name: prod-app
+      port:
+        number: 80
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prod-app
+                port:
+                  number: 80
+          - path: /staging(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: staging-app
+                port:
+                  number: 80
+          - path: /dev(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-app
+                port:
+                  number: 80
