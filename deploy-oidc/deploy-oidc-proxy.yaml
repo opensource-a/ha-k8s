@@ -16,26 +16,23 @@ spec:
         fsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
-      imagePullSecrets:
-        - name: regcred        
       containers:
         - name: main-oidc-proxy
           image: mriedmann/louketo-proxy
           imagePullPolicy: Always
           args:
-            - --client-id=**************************************
-            - --client-secret=**********************************
+            - --client-id=**********************************************************
+            - --client-secret=******************************************************
             - --discovery-url=https://accounts.google.com
             - --enable-default-deny=true
             - --enable-json-logging=true
             - --enable-logging=true
             - --enable-request-id=true
-            - --enable-security-filter=true
             - --secure-cookie=false
             - --http-only-cookie=false 
             - --listen=0.0.0.0:3000
             - --preserve-host=true
-            - --redirection-url=********************************
+            - --redirection-url=*****************************************************
             - --resources=uri=/*
 #            - --skip-client-id=false
             - --upstream-url=https://ingress-nginx-controller.ingress-nginx.svc.cluster.local
@@ -44,7 +41,6 @@ spec:
             - --skip-upstream-tls-verify=true
             - --enable-token-header=true  #                   enables the token authentication header X-Auth-Token to upstream (default: true)
             - --enable-authorization-header=true
-            - --enable-https-redirection=true
           securityContext:
             readOnlyRootFilesystem: true
           ports:
@@ -52,8 +48,10 @@ spec:
           resources:
             limits:
               cpu: 50m
+              memory: 200M
             requests:
               cpu: 20m
+              memory: 100M
 ---
 apiVersion: v1
 kind: Service
