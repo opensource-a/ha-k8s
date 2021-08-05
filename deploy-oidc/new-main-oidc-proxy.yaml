@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: main-oidc-proxy
+  name: main-oidc-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: main-oidc-proxy
+  template:
+    metadata:
+      labels:
+        k8s-app: main-oidc-proxy
+    spec:
+      containers:
+      - args:
+          - --provider=oidc
+          - --email-domain=*
+          - --upstream=https://ingress-nginx-controller.ingress-nginx.svc.cluster.local
+          - --http-address=0.0.0.0:4180
+          - --client-id=838085145251-d7smcjss62fjjfuorsiglvd7c4o3f86h.apps.googleusercontent.com
+          - --client-secret=HvWvygmPvoUQE-i7wRKNVWCA
+          - --cookie-httponly=false
+          - --cookie-secure=true
+          - --cookie-secret=MsVRjD36bfAxfBvHUKUjXOTPXaItDThn
+          - --insecure-oidc-allow-unverified-email=true
+          - --insecure-oidc-skip-issuer-verification=true
+          - --insecure-oidc-skip-nonce=true
+          - --oidc-issuer-url=https://accounts.google.com
+          - --proxy-prefix=/oauth
+          - --redirect-url=https://app-966874057.us-east-1.elb.amazonaws.com/oauth/callback
+          - --scope=openid
+          - --silence-ping-logging=true
+          - --ssl-insecure-skip-verify=true
+          - --ssl-upstream-insecure-skip-verify=true
+        image: quay.io/oauth2-proxy/oauth2-proxy:latest
+        imagePullPolicy: Always
+        name: main-oidc-proxy
+        ports:
+        - containerPort: 4180
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 50m
+            memory: 200M
+          requests:
+            cpu: 20m
+            memory: 100M
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-oidc-proxy
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 4180
+    targetPort: 4180
+    nodePort: 32252
+  selector:
+    k8s-app: main-oidc-proxy
