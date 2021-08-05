@@ -251,6 +251,25 @@ Resources:
               exclude=kubelet kubeadm kubectl
               EOF
               
+              mkdir /etc/docker
+              
+              cat <<EOF | sudo tee /etc/docker/daemon.json
+              {
+                 "exec-opts": ["native.cgroupdriver=systemd"],
+                 "log-driver": "json-file",
+                 "log-opts": {
+                 "max-size": "100m"
+                 },
+                 "storage-driver": "overlay2"
+              }
+              EOF
+              
+              systemctl enable docker
+              
+              systemctl daemon-reload
+              
+              systemctl restart docker
+              
               # Set SELinux in permissive mode (effectively disabling it)
               setenforce 0
               sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
