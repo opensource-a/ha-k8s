@@ -38,6 +38,7 @@ spec:
           - --user-id-claim=sub
 #          - --show-debug-on-error=true
           - --skip-provider-button=true          
+          - --set-authorization-header=true
         image: quay.io/oauth2-proxy/oauth2-proxy:latest
         imagePullPolicy: Always
         name: main-oidc-proxy
